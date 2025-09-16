@@ -1,0 +1,9 @@
+Flask
+Flask-CORS
+nltk
+transformers
+torch
+jmespath
+parsel
+nested-lookup
+playwright
