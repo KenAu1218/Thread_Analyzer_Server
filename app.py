@@ -1,5 +1,7 @@
 import os
-from flask import Flask, request, jsonify
+
+import requests
+from flask import Flask, request, jsonify, Response
 from flask_cors import CORS
 from scrape_thread import scrape_thread
 
@@ -40,6 +42,34 @@ def analyze_thread_endpoint():
         print(f"An error occurred: {e}")
         return jsonify({"error": str(e)}), 500
 
+
+# --- NEW: Image Proxy Endpoint ---
+# This new route is dedicated to fetching images.
+@app.route('/image-proxy')
+def image_proxy():
+    """
+    Fetches an image from a given URL and returns it to the client.
+    This bypasses CORS issues for client-side image loading.
+    """
+    image_url = request.args.get('url')
+    if not image_url:
+        return "URL parameter is required", 400
+
+    try:
+        # Use a User-Agent to pretend we're a browser
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        }
+        # Use stream=True to efficiently handle the image data
+        response = requests.get(image_url, stream=True, headers=headers, timeout=10)
+        response.raise_for_status()
+
+        # Send the raw image data back with the correct content type
+        return Response(response.iter_content(chunk_size=1024), content_type=response.headers['Content-Type'])
+
+    except requests.exceptions.RequestException as e:
+        print(f"Error proxying image {image_url}: {e}")
+        return "Could not fetch image", 500
 
 # This allows you to run the app by executing "python app.py"
 if __name__ == '__main__':

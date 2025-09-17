@@ -47,9 +47,9 @@ def parse_thread(data: Dict) -> Dict:
 
     result["url"] = f"https://www.threads.net/@{result.get('username')}/post/{result.get('code')}"
 
-    # download image to base64
-    user_pic_url = result.pop('user_pic', None)  # Remove the original URL
-    result["user_pic_base64"] = get_image_as_base64(user_pic_url)
+    # # download image to base64
+    # user_pic_url = result.pop('user_pic', None)  # Remove the original URL
+    # result["user_pic_base64"] = get_image_as_base64(user_pic_url)
 
     result["sentiment"] = analyze_sentiment_advanced(result.get("text"))
 
@@ -101,6 +101,7 @@ def scrape_thread(url: str) -> dict:
                         replies.append(t)
 
                 if main_thread:
+                    print(f"Found replies '{replies}'.")
                     return {
                         "thread": main_thread,
                         "replies": replies,
