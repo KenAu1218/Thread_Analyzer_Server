@@ -14,6 +14,7 @@ app = Flask(__name__)
 CORS(app)
 
 
+# server starting "python app.py"
 # Define the API endpoint
 @app.route('/analyze', methods=['POST'])
 def analyze_thread_endpoint():

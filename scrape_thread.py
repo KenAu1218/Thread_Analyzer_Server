@@ -15,7 +15,7 @@ from parsel import Selector
 from nested_lookup import nested_lookup
 # FIX 2: Import TimeoutError to handle cases where the popup doesn't appear.
 from playwright.sync_api import sync_playwright, TimeoutError
-
+from analysis_sentiment import analyze_sentiment_advanced, analyze_image_content
 
 
 def parse_thread(data: Dict) -> Dict:
@@ -35,31 +35,57 @@ def parse_thread(data: Dict) -> Dict:
         has_audio: post.has_audio,
         reply_count: view_replies_cta_string,
         like_count: post.like_count,
-        images: post.carousel_media[].image_versions2.candidates[1].url,
+        images: post.carousel_media[].image_versions2.candidates[1].url || [post.image_versions2.candidates[1].url],
         image_count: post.carousel_media_count,
         videos: post.video_versions[].url
     }""",
         data,
     )
+
+    # --- NEW FIX STARTS HERE ---
+
+    # 1. Filter out 'null' images from text-only posts
+    if result.get("images"):
+        result["images"] = [url for url in result["images"] if url]
+
+    # 2. Prioritize video/GIFs to prevent duplicates
+    # If a post has a video, it is the primary media.
+    # We clear the images array to avoid showing the static preview image.
+    if result.get("videos"):
+        result["images"] = []
+
+    # --- NEW FIX ENDS HERE ---
+
     result["videos"] = list(set(result.get("videos") or []))
     if result.get("reply_count") and not isinstance(result["reply_count"], int):
         result["reply_count"] = int(result["reply_count"].split(" ")[0])
 
     result["url"] = f"https://www.threads.net/@{result.get('username')}/post/{result.get('code')}"
 
-    # # download image to base64
-    # user_pic_url = result.pop('user_pic', None)  # Remove the original URL
-    # result["user_pic_base64"] = get_image_as_base64(user_pic_url)
-
     result["sentiment"] = analyze_sentiment_advanced(result.get("text"))
 
-    return result
+    image_urls = result.get("images") or []
+    result["image_descriptions"] = []
+    if image_urls:
+        print(f"Found {len(image_urls)} images to analyze...")
+        for url in image_urls:
+            description = analyze_image_content(url)
+            print(f"  - Description: {description}")
+            image_sentiment = analyze_sentiment_advanced(description)
+            print(f"  - Sentiment: {image_sentiment['label']}")
+            result["image_descriptions"].append({
+                "url": url,
+                "description": description,
+                "sentiment": image_sentiment
+            })
 
+    return result
 
 def scrape_thread(url: str) -> dict:
     """Scrape Threads post and replies from a given URL"""
     try:
-        post_code = url.strip("/").split("/")[-1]
+        last_part = url.strip("/").split("/")[-1]
+        post_code = last_part.split("?")[0]
     except IndexError:
         raise ValueError(f"Could not extract post code from URL: {url}")
 
@@ -101,13 +127,16 @@ def scrape_thread(url: str) -> dict:
                         replies.append(t)
 
                 if main_thread:
-                    print(f"Found replies '{replies}'.")
+                    replies.sort(key=lambda r: r.get('published_on', 0))
+
+                    print(f"Found and sorted {len(replies)} replies.")
                     return {
                         "thread": main_thread,
                         "replies": replies,
                     }
 
         raise ValueError(f"Could not find thread data for post code {post_code} in the page")
+
 
 def get_image_as_base64(url: str) -> str:
     """Downloads an image and returns it as a Base64 encoded string."""
@@ -122,7 +151,7 @@ def get_image_as_base64(url: str) -> str:
         response.raise_for_status()
         encoded_string = base64.b64encode(response.content).decode('utf-8')
 
-        print("encoded_string",encoded_string)
+        print("encoded_string", encoded_string)
         return f"data:{response.headers['Content-Type']};base64,{encoded_string}"
         # Return a data URI which can be used directly in an <img> src attribute
         return f"data:{response.headers['Content-Type']};base64,{encoded_string}"
