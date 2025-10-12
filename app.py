@@ -1,4 +1,5 @@
 import os
+import re
 
 import requests
 from flask import Flask, request, jsonify, Response
@@ -28,6 +29,17 @@ def analyze_thread_endpoint():
     if not url:
         # Return an error if the URL is missing
         return jsonify({"error": "URL is required"}), 400
+
+    # --- NEW: URL Validation Logic ---
+    # This regex ensures the URL is a valid Threads post link.
+    # It must be from threads.net or threads.com, have a username with '@',
+    # and include '/post/' followed by an ID.
+    pattern = re.compile(r"^https://www\.threads\.(net|com)/@[\w.]+/post/[\w-]+.*$")
+    if not pattern.match(url):
+        return jsonify({
+            "error": "Invalid Threads URL. Please use the format: https://www.threads.net/@username/post/..."
+        }), 400
+    # --- END of Validation Logic ---
 
     try:
         # 2. Run your existing scraping function

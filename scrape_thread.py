@@ -58,7 +58,12 @@ def parse_thread(data: Dict) -> Dict:
 
     result["videos"] = list(set(result.get("videos") or []))
     if result.get("reply_count") and not isinstance(result["reply_count"], int):
-        result["reply_count"] = int(result["reply_count"].split(" ")[0])
+        reply_string = result["reply_count"].split(" ")[0]
+
+        if reply_string.isdigit():
+            result["reply_count"] = int(reply_string)
+        else:
+            result["reply_count"] = 0
 
     result["url"] = f"https://www.threads.net/@{result.get('username')}/post/{result.get('code')}"
 
@@ -80,6 +85,7 @@ def parse_thread(data: Dict) -> Dict:
             })
 
     return result
+
 
 def scrape_thread(url: str) -> dict:
     """Scrape Threads post and replies from a given URL"""
@@ -127,7 +133,12 @@ def scrape_thread(url: str) -> dict:
                         replies.append(t)
 
                 if main_thread:
-                    replies.sort(key=lambda r: r.get('published_on', 0))
+                    op_username = main_thread.get('username')
+                    replies.sort(
+                        key=lambda r: (r.get('username') == op_username, r.get('like_count', 0),
+                                       r.get('published_on', 0)),
+                        reverse=True
+                    )
 
                     print(f"Found and sorted {len(replies)} replies.")
                     return {

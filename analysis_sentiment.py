@@ -22,7 +22,7 @@ def analyze_sentiment_advanced(text: str):
     Analyzes sentiment using a state-of-the-art Transformer model.
     """
     if not text:
-        return {'label': 'neutral', 'score': 1.0}
+        return None
     results = sentiment_pipeline(text, truncation=True, max_length=512)
     return results[0]
 
