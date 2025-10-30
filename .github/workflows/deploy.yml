@@ -29,7 +29,7 @@ jobs:
         uses: google-github-actions/setup-gcloud@v2
 
       - name: Configure Docker
-        run: echo "${{ secrets.GCP_SA_KEY }}" | docker login -u _json_key --password-stdin https://${{ env.REGION }}-docker.pkg.dev
+        run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev
 
       # --- START: NEW DEBUG STEP ---
       - name: Debug Print Project ID
@@ -40,7 +40,7 @@ jobs:
         # This builds your Dockerfile and tags it
         run: |
           docker build -t ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.SERVICE_NAME }}:${{ github.sha }} .
-          docker push ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.SERVICE_NAME }}:${{ github.sha }}
+          docker push ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.SERVICE_NAME }}/${{ env.SERVICE_NAME }}:${{ github.sha }}
 
       - name: Deploy to Cloud Run
         # This points Cloud Run to the new image and makes it public
