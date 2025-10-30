@@ -7,7 +7,7 @@ on:
     branches: [ "main" ] # Trigger the pipeline on every push to the main branch
 
 env:
-  PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+  PROJECT_ID: thread-sentiment-analyzer
   SERVICE_NAME: thread-analyzer-api # Choose a name for your app
   REGION: us-central1 # Choose a region
 
@@ -35,7 +35,7 @@ jobs:
       - name: Debug Print Project ID
         run: echo "The Project ID is [${{ env.PROJECT_ID }}]"
       # --- END: NEW DEBUG STEP ---
-      
+
       - name: Build and Push Docker Image
         # This builds your Dockerfile and tags it
         run: |
