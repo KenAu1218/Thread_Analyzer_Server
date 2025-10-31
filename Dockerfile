@@ -14,8 +14,11 @@ COPY download_nltk_data.py .
 # 4. Install all Python packages
 RUN pip install --no-cache-dir -r requirements.txt
 
-# 5. Download the NLTK data (same as you did locally)
+# 5. Download the NLTK data
 RUN python download_nltk_data.py
+
+# Download language twitter model
+RUN python download_ai_twitter_model.py
 
 # 6. Copy the rest of your application code into the container
 COPY . .

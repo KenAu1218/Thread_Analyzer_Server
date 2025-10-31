@@ -12,10 +12,7 @@ sentiment_analyzer = SentimentIntensityAnalyzer()
 
 
 # Load the model once and reuse it
-sentiment_pipeline = pipeline(
-    "sentiment-analysis",
-    model="cardiffnlp/twitter-roberta-base-sentiment-latest"
-)
+sentiment_pipeline = pipeline("sentiment-analysis", model="./local-model")
 
 def analyze_sentiment_advanced(text: str):
     """
