@@ -18,6 +18,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 RUN python download_nltk_data.py
 
 # Download language twitter model
+COPY download_ai_twitter_model.py .
+#    ...and then runs it.
 RUN python download_ai_twitter_model.py
 
 # 6. Copy the rest of your application code into the container
