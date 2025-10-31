@@ -26,4 +26,4 @@ RUN playwright install
 # 8. Set the command to run your app
 # We use Gunicorn (the production server) to run the 'app' object from 'app.py'
 # It binds to 0.0.0.0 and a $PORT variable, which Cloud Run will provide.
-CMD ["gunicorn", "--bind", "0.0.0.0:$PORT", "app:app"]
+CMD ["sh", "-c", "gunicorn --bind 0.0.0.0:$PORT app:app"]
