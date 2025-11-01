@@ -21,9 +21,9 @@ RUN python download_nltk_data.py
 COPY download_ai_twitter_model.py .
 RUN python download_ai_twitter_model.py
 
-# Download image captioning model
-COPY download_image_captioning_model.py .
-RUN python download_image_captioning_model.py
+## Download image captioning model
+#COPY download_image_captioning_model.py .
+#RUN python download_image_captioning_model.py
 
 # 6. Copy the rest of your application code into the container
 COPY . .

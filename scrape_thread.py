@@ -15,7 +15,8 @@ from parsel import Selector
 from nested_lookup import nested_lookup
 # FIX 2: Import TimeoutError to handle cases where the popup doesn't appear.
 from playwright.sync_api import sync_playwright, TimeoutError
-from analysis_sentiment import analyze_sentiment_advanced, analyze_image_content
+# from analysis_sentiment import analyze_sentiment_advanced, analyze_image_content
+from analysis_sentiment import analyze_sentiment_advanced
 
 
 def parse_thread(data: Dict) -> Dict:
