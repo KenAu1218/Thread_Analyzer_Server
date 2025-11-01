@@ -1,18 +1,24 @@
-from nltk.sentiment import sentiment_analyzer, SentimentIntensityAnalyzer
-
+import nltk
+from nltk.sentiment import SentimentIntensityAnalyzer
 from typing import Dict, List
-
-from transformers import pipeline
-
+from transformers import pipeline, BlipProcessor, BlipForConditionalGeneration
 import requests
 from PIL import Image
 
-# Initialize the sentiment analyzer once
-sentiment_analyzer = SentimentIntensityAnalyzer()
+# Initialize the NLTK sentiment analyzer once
+# Ensure you have run `python download_nltk_data.py` in your Dockerfile
+try:
+    sentiment_analyzer = SentimentIntensityAnalyzer()
+except LookupError:
+    print("NLTK 'vader_lexicon' not found. Make sure it's downloaded.")
+    nltk.download('vader_lexicon')
+    sentiment_analyzer = SentimentIntensityAnalyzer()
 
-
-# Load the model once and reuse it
+# --- THIS PART IS CORRECT ---
+# Load the sentiment model from the local directory
 sentiment_pipeline = pipeline("sentiment-analysis", model="./local-model")
+print("Successfully loaded LOCAL sentiment model.")
+
 
 def analyze_sentiment_advanced(text: str):
     """
@@ -25,7 +31,7 @@ def analyze_sentiment_advanced(text: str):
 
 def analyze_sentiment(text: str) -> Dict:
     """
-scrape_thread    Analyzes the sentiment of a given text and returns the scores.
+    Analyzes the sentiment of a given text and returns the scores.
     """
     if not text:
         return {}
@@ -33,29 +39,30 @@ scrape_thread    Analyzes the sentiment of a given text and returns the scores.
     return scores
 
 
-
-# --- NEW: Image Captioning Model ---
-# Load the image captioning model and its processor once
+# --- THIS IS THE UPDATED PART ---
+# Load the image captioning model and its processor from their LOCAL directory
 image_captioning_processor = None
 image_captioning_model = None
+IMAGE_MODEL_PATH = "./local-image-model" # Path we will use in the download script
+
 try:
-    # This downloads the model the first time it's run
-    from transformers import BlipProcessor, BlipForConditionalGeneration
-    image_captioning_processor = BlipProcessor.from_pretrained("Salesforce/blip-image-captioning-large")
-    image_captioning_model = BlipForConditionalGeneration.from_pretrained("Salesforce/blip-image-captioning-large")
-    print("Successfully loaded Image Captioning model.")
+    # This now loads from the local folder, not the internet
+    image_captioning_processor = BlipProcessor.from_pretrained(IMAGE_MODEL_PATH)
+    image_captioning_model = BlipForConditionalGeneration.from_pretrained(IMAGE_MODEL_PATH)
+    print("Successfully loaded LOCAL Image Captioning model.")
 except ImportError:
     print("Could not import Blip model. Please ensure 'transformers', 'torch', and 'Pillow' are installed.")
 except Exception as e:
-    print(f"An error occurred while loading the image captioning model: {e}")
+    print(f"An error occurred while loading the LOCAL image captioning model from {IMAGE_MODEL_PATH}: {e}")
+    print("Make sure the model was downloaded correctly during the build.")
 
 
 def analyze_image_content(image_url: str) -> str:
     """
     Downloads an image from a URL and generates a text description using a vision model.
     """
-    if not image_url or not image_captioning_model:
-        return "Could not analyze image."
+    if not image_url or not image_captioning_model or not image_captioning_processor:
+        return "Could not analyze image (model not loaded)."
 
     try:
         # 1. Download the image and open it
@@ -77,3 +84,4 @@ def analyze_image_content(image_url: str) -> str:
     except Exception as e:
         print(f"Failed to analyze image at {image_url}: {e}")
         return "Failed to analyze image."
+
