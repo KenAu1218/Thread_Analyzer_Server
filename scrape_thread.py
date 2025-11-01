@@ -69,20 +69,20 @@ def parse_thread(data: Dict) -> Dict:
 
     result["sentiment"] = analyze_sentiment_advanced(result.get("text"))
 
-    image_urls = result.get("images") or []
-    result["image_descriptions"] = []
-    if image_urls:
-        print(f"Found {len(image_urls)} images to analyze...")
-        for url in image_urls:
-            description = analyze_image_content(url)
-            print(f"  - Description: {description}")
-            image_sentiment = analyze_sentiment_advanced(description)
-            print(f"  - Sentiment: {image_sentiment['label']}")
-            result["image_descriptions"].append({
-                "url": url,
-                "description": description,
-                "sentiment": image_sentiment
-            })
+    # image_urls = result.get("images") or []
+    # result["image_descriptions"] = []
+    # if image_urls:
+        # print(f"Found {len(image_urls)} images to analyze...")
+        # for url in image_urls:
+            # description = analyze_image_content(url)
+            # print(f"  - Description: {description}")
+            # image_sentiment = analyze_sentiment_advanced(description)
+            # print(f"  - Sentiment: {image_sentiment['label']}")
+            # result["image_descriptions"].append({
+            #     "url": url,
+                # "description": description,
+                # "sentiment": image_sentiment
+            # })
 
     return result
 
