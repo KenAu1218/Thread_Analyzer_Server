@@ -3,7 +3,7 @@ from nltk.sentiment import SentimentIntensityAnalyzer
 from typing import Dict, List
 from transformers import pipeline, BlipProcessor, BlipForConditionalGeneration
 import requests
-from PIL import Image
+# from PIL import Image
 
 # Initialize the NLTK sentiment analyzer once
 # Ensure you have run `python download_nltk_data.py` in your Dockerfile

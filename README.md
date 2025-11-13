@@ -16,7 +16,7 @@ python3 download_image_captioning_model.py
 playwright install
 
 # 5. Run commend to start the server in terminal
-python app.py
+python app.py or python3 app.py
 
 
 
