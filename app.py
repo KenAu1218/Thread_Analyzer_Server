@@ -14,6 +14,11 @@ app = Flask(__name__)
 # Enable CORS to allow your front-end to make requests to this server
 CORS(app)
 
+@app.before_request
+def log_request_info():
+    # CAUTION: This will log the body of every request.
+    # Be careful with large files or sensitive data (passwords/PII).
+    app.logger.info(f"Request Body: {request.get_data()}")
 
 # server starting "python app.py"
 # Define the API endpoint
