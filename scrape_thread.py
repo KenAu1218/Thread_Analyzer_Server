@@ -1,21 +1,12 @@
-import base64
-import os
 import json
-from typing import Dict, List
-
-import requests
-
-os.environ["TOKENIZERS_PARALLELISM"] = "false"
-
 import jmespath
 from parsel import Selector
 from nested_lookup import nested_lookup
-from playwright.sync_api import sync_playwright, TimeoutError
+from playwright.sync_api import sync_playwright
 from analysis_sentiment import analyze_sentiment_advanced
 
 
-def parse_thread(data: Dict) -> Dict:
-    """Parse Threads post JSON dataset for the most important fields"""
+def parse_thread(data: dict) -> dict:
     result = jmespath.search(
         """{
         text: post.caption.text,
@@ -30,7 +21,7 @@ def parse_thread(data: Dict) -> Dict:
         like_count: post.like_count,
         carousel_images: post.carousel_media[].image_versions2.candidates[1].url,
         single_image: post.image_versions2.candidates[1].url,
-        giphy_image: post.giphy_media_info.images.fixed_height.url,
+        giphy_image: post.giphy_media_info.images.fixed_height.url || post.giphy_media_info[].images.fixed_height.url || post.giphy_media_info.images[].fixed_height.url || post.giphy_media_info[].images[1].fixed_height.url,
         videos: post.video_versions[].url,
         reply_to_author_name: post.text_post_app_info.reply_to_author.username,
         is_reply: post.text_post_app_info.is_reply
@@ -38,22 +29,18 @@ def parse_thread(data: Dict) -> Dict:
         data,
     )
 
-    if (result.get("username") == "charlieneiss"):
-        print("charlieneiss: result", result)
-        print("charlieneiss: ", result.get("images"))
 
     carousel = result.get("carousel_images")
     single = result.get("single_image")
     giphy = result.get("giphy_image")
 
     if carousel:
-        result["images"] = carousel  # This is already a list
+        result["images"] = carousel
     elif single:
-        result["images"] = [single]  # Wrap the single URL in a list
+        result["images"] = [single]
     else:
-        result["images"] = []  # Default to an empty list
+        result["images"] = []
 
-    # Clean up the temporary keys
     result.pop("carousel_images", None)
     result.pop("single_image", None)
 
@@ -61,38 +48,18 @@ def parse_thread(data: Dict) -> Dict:
         result["gifImages"] = [giphy]
     result.pop("giphy_image", None)
 
-    # If a post has a video, it is the primary media.
-    # We clear the images array to avoid showing the static preview image.
     if result.get("videos"):
         result["images"] = []
 
     result["videos"] = list(set(result.get("videos") or []))
-
     result["url"] = f"https://www.threads.net/@{result.get('username')}/post/{result.get('code')}"
-
     result["sentiment"] = analyze_sentiment_advanced(result.get("text"))
 
-    # For image analysis ***********
-    # image_urls = result.get("images") or []
-    # result["image_descriptions"] = []
-    # if image_urls:
-    #     print(f"Found {len(image_urls)} images to analyze...")
-    # for url in image_urls:
-    #     description = analyze_image_content(url)
-    # print(f"  - Description: {description}")
-    # image_sentiment = analyze_sentiment_advanced(description)
-    # print(f"  - Sentiment: {image_sentiment['label']}")
-    # result["image_descriptions"].append({
-    #     "url": url,
-    #     "description": description,
-    #     "sentiment": image_sentiment
-    # })
-    # For image analysis ***********
     return result
 
 
 def scrape_thread(url: str) -> dict:
-    """Scrape Threads post and replies from a given URL"""
+    """Scrape Threads post using aggressive resource blocking"""
     try:
         last_part = url.strip("/").split("/")[-1]
         post_code = last_part.split("?")[0]
@@ -100,18 +67,55 @@ def scrape_thread(url: str) -> dict:
         raise ValueError(f"Could not extract post code from URL: {url}")
 
     with sync_playwright() as pw:
-        browser = pw.chromium.launch()
-        context = browser.new_context(viewport={"width": 1920, "height": 1080})
+        # Launch headless (invisible)
+        browser = pw.chromium.launch(headless=True)
+
+        # Set a realistic viewport so Threads doesn't think we are a bot/mobile
+        context = browser.new_context(
+            viewport={"width": 1280, "height": 800},
+            user_agent='Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        )
         page = context.new_page()
 
+        # ---------------------------------------------------------
+        # THE BLOCKING LOGIC
+        # We allow: 'document' (HTML), 'script' (JS), 'xhr', 'fetch' (Data)
+        # We block: Everything visual.
+        # ---------------------------------------------------------
+        excluded_resource_types = ["image", "media", "font", "stylesheet", "other"]
+
+        def block_aggressively(route):
+            if route.request.resource_type in excluded_resource_types:
+                # print(f"Blocking: {route.request.resource_type}") # Uncomment to debug
+                route.abort()
+            else:
+                route.continue_()
+
+        page.route("**/*", block_aggressively)
+        # ---------------------------------------------------------
+
         print(f"Navigating to URL: {url}")
-        page.goto(url)
 
-        print(f"Waiting for post '{post_code}' to appear...")
-        page.wait_for_selector(f'a[href*="{post_code}"]')
-        print("Post found. Parsing page content...")
+        # domcontentloaded is enough. We don't need 'networkidle' (too slow).
+        page.goto(url, wait_until="domcontentloaded", timeout=15000)
 
-        selector = Selector(page.content())
+        # OPTIMIZATION: Don't wait for the visual Link (<a>).
+        # Wait directly for the DATA script.
+        # Since we blocked CSS, the visual link might look weird or not render,
+        # but the <script> tag is always there.
+        print(f"Waiting for data script...")
+        try:
+            # We wait specifically for the JSON script tag
+            page.wait_for_selector('script[type="application/json"][data-sjs]', state="attached", timeout=10000)
+        except Exception:
+            print("Warning: Timeout waiting for selector, attempting to parse anyway...")
+
+        print("Parsing page content...")
+
+        # We don't need to visually interact, so we just grab the HTML text
+        html_content = page.content()
+        selector = Selector(text=html_content)
+
         hidden_datasets = selector.css('script[type="application/json"][data-sjs]::text').getall()
 
         for hidden_dataset in hidden_datasets:
@@ -126,68 +130,30 @@ def scrape_thread(url: str) -> dict:
                 if not thread_items:
                     continue
 
-                print("thread_items", thread_items)
                 threads = [parse_thread(t) for thread in thread_items for t in thread]
 
-                # --- Step 1: Find the main thread first ---
+                # 1. Find Main Thread
                 main_thread = next((t for t in threads if t.get("code") == post_code), None)
 
                 replies = []
 
-                # --- Step 2: If the main thread exists, find its direct replies ---
+                # 2. Find Replies
                 if main_thread:
-                    # Get the username of the main thread's author
                     op_username = main_thread.get('username')
-
-                    # Iterate again to find only replies to the main thread
                     for t in threads:
-                        # Skip the main thread itself
                         if t.get("code") == post_code:
                             continue
-
-                        # Get the 'reply_to_author' object for checking
-                        if (t.get("is_reply") is not None and t.get("reply_to_author_name") is not None and t.get(
-                                "is_reply") is True and t.get("reply_to_author_name") == op_username):
+                        if (t.get("is_reply") is True and
+                                t.get("reply_to_author_name") == op_username):
                             replies.append(t)
 
-                    # --- Step 3: Sort the filtered replies ---
-                    # cant predict the sorting algorithm of facebook
-                    # sort replies by taken_at
-                    # replies.sort(
-                    #     key=lambda r: (r.get('username') == op_username, r.get('taken_at', 0),
-                    #                    ),
-                    #     reverse=True
-                    # )
-
-                    print(f"Found and sorted {len(replies)} replies to the main thread.")
+                    print(f"Found {len(replies)} replies.")
                     return {
                         "thread": main_thread,
                         "replies": replies,
                     }
 
-                # Handle case where the main thread with 'post_code' was not found
                 print(f"Main thread with code {post_code} not found.")
-                return None  # Or {"thread": None, "replies": []}
+                return None
 
-        raise ValueError(f"Could not find thread data for post code {post_code} in the page")
-
-# def get_image_as_base64(url: str) -> str:
-#     """Downloads an image and returns it as a Base64 encoded string."""
-#     if not url:
-#         print("No URL provided.")
-#         return None
-#     try:
-#         headers = {
-#             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-#         }
-#         response = requests.get(url, timeout=10, headers=headers)  # <-- Pass headers here
-#         response.raise_for_status()
-#         encoded_string = base64.b64encode(response.content).decode('utf-8')
-#
-#         print("encoded_string", encoded_string)
-#         return f"data:{response.headers['Content-Type']};base64,{encoded_string}"
-#         # Return a data URI which can be used directly in an <img> src attribute
-#         return f"data:{response.headers['Content-Type']};base64,{encoded_string}"
-#     except requests.exceptions.RequestException as e:
-#         print(f"Could not fetch image from {url}: {e}")
-#         return None
+        raise ValueError(f"Could not find thread data for post code {post_code}")
