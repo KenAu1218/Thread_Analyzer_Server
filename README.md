@@ -30,6 +30,7 @@
 https://threadsentimentanalyer.netlify.app/
 
 PS: This project only support threads in english language, the model for sentiment analyzing using is cardiffnlp/twitter-roberta-base-sentiment-latest
+PS: This project utilizes Google Cloud serverless architecture. To optimize costs, the server scales to zero, which may result in a short delay for the first request as the instance wakes up.
 
 # Demo link
 
